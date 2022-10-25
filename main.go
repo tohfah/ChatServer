@@ -18,6 +18,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	go broadcast()
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -35,5 +37,23 @@ var (
 	msg = make(chan string)
 )
 
+//broadcast message to all clients
+func broadcast() {
+	clients := make(map[client]bool)
+
+	for {
+		select {
+			case msg := <-messages:
+				for cli := range clients {
+					cli <- msg
+				}
+			case newCli := <-entering:
+				clients[newCli] = true
+			case leaveCli := <-leaving:
+				delete(clients, leaveCli)
+				close(leaveCli)
+		}
+	}
+}
 
 
