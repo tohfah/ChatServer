@@ -72,3 +72,25 @@ func NewMessage(client *Client, text string) *Message {
 		text:   text,
 	}
 }
+
+func main() {
+
+	mainRoom := NewMainRoom()
+
+	listener, err := net.Listen(TYPE, PORT)
+	if err != nil {
+		log.Println("Error: ", err)
+		os.Exit(1)
+	}
+	defer listener.Close()
+	log.Println("Listening on " + PORT)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Error: ", err)
+			continue
+		}
+		mainRoom.Join(NewClient(conn))
+	}
+}
