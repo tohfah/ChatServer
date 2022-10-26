@@ -21,12 +21,11 @@ const (
 	serverName = "server"
 )
 
-type Room struct {
+type MainRoom struct {
 	clients  []*Client
 	incoming chan *Message
 	join     chan *Client
 	quit     chan *Client
-	messages []string
 }
 
 type Client struct {
