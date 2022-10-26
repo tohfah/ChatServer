@@ -41,3 +41,34 @@ type Message struct {
 	client *Client
 	text   string
 }
+
+func NewMainRoom() *MainRoom {
+	mainRoom := &MainRoom{
+		clients:  make([]*Client, 0),
+		incoming: make(chan *Message),
+		join:     make(chan *Client),
+		quit:     make(chan *Client),
+	}
+}
+
+func NewClient(conn net.Conn) *Client {
+	writer := bufio.NewWriter(conn)
+	reader := bufio.NewReader(conn)
+
+	client := &Client{
+		name:     CLIENT_NAME,
+		incoming: make(chan *Message),
+		outgoing: make(chan string),
+		conn:     conn,
+		reader:   reader,
+		writer:   writer,
+	}
+
+}
+
+func NewMessage(client *Client, text string) *Message {
+	return &Message{
+		client: client,
+		text:   text,
+	}
+}
