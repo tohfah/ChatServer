@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	port     = ":8080"
-	connType = "tcp"
+	PORT     = ":8080"
+	TYPE     = "tcp"
 )
 
 var wg sync.WaitGroup
@@ -51,7 +51,7 @@ func Write(conn net.Conn) {
 func main() {
 	wg.Add(1)
 
-	conn, err := net.Dial(connType, port)
+	conn, err := net.Dial(TYPE, PORT)
 	if err != nil {
 		fmt.Println(err)
 	}
