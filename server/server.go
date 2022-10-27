@@ -127,6 +127,43 @@ func (mainRoom *MainRoom) Parse(message *Message) {
 
 }
 
+// Reads in from client's socket and place msg on incoming channel
+func (client *Client) Read() {
+	for {
+		str, err := client.reader.ReadString('\n')
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		message := NewMessage(client, strings.TrimSuffix(str, "\n"))
+		client.incoming <- message
+	}
+	close(client.incoming)
+	log.Println("Closed client's incoming channel.")
+}
+
+// Reads from the Client's outgoing channel & write to client's socket
+func (client *Client) Write() {
+	for str := range client.outgoing {
+		_, err := client.writer.WriteString(str)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		err = client.writer.Flush()
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
+	log.Println("Closed client's write thread")
+}
+
+func (client *Client) Listen() {
+	go client.Read()
+	go client.Write()
+}
+
 func main() {
 
 	mainRoom := NewMainRoom()
