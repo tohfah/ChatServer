@@ -65,7 +65,7 @@ func NewClient(conn net.Conn) *Client {
 		reader:   reader,
 		writer:   writer,
 	}
-	fmt.Print(client)
+	client.Listen()
 	return client
 }
 
@@ -117,14 +117,23 @@ func (mainRoom *MainRoom) Parse(message *Message) {
 		case strings.HasPrefix(message.text, CMD_QUIT):
 			message.client.conn.Close()
 		case strings.HasPrefix(message.text, CMD_MSG):
-			fmt.Print("need to create msg func")
+			mainRoom.SendMessage(message)
 		default:
 			message.client.outgoing <- "Unknown command. Type /help for a list of available commands."
 		}
 	} else {
-		fmt.Print("need to create msg func")
+		mainRoom.SendMessage(message)
 	}
 
+}
+
+// send message to all clients in the room
+func (mainRoom *MainRoom) SendMessage(message *Message) {
+	msg := ">> " + message.client.name + ": " + message.text + "\n"
+	for _, client := range mainRoom.clients {
+		client.outgoing <- msg
+	}
+	log.Println("client sent message")
 }
 
 // Reads in from client's socket and place msg on incoming channel
