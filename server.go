@@ -9,16 +9,15 @@ import (
 )
 
 const (
-	//port     = "8088"
-	//connType = "tcp"
+	PORT     = ":8088"
+	TYPE 	 = "tcp"
 
-	cmdName    = "/name"
-	cmdMessage = "/msg"
-	cmdQuit    = "/quit"
-	cmdHelp    = "/help"
+	CMD_NAME    = "/name"
+	CMD_MSG     = "/msg"
+	CMD_QUIT    = "/quit"
+	CMD_HELP    = "/help"
 
-	clientName = "anon"
-	serverName = "server"
+	NAME = "anon"
 )
 
 type MainRoom struct {
