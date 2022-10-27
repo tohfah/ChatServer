@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	PORT     = ":8088"
+	PORT     = ":8080"
 	TYPE 	 = "tcp"
 
 	CMD_NAME    = "/name"
@@ -48,6 +48,8 @@ func NewMainRoom() *MainRoom {
 		join:     make(chan *Client),
 		quit:     make(chan *Client),
 	}
+	mainRoom.Listen()
+	return mainRoom
 }
 
 func NewClient(conn net.Conn) *Client {
@@ -70,6 +72,22 @@ func NewMessage(client *Client, text string) *Message {
 		client: client,
 		text:   text,
 	}
+}
+
+// constantly listen to all channels in main room
+func (mainRoom *MainRoom) Listen() {
+	go func() {
+		for {
+			select {
+				case message := <-mainRoom.incoming:
+					mainRoom.Parse(message)
+				case client := <-mainRoom.join:
+					mainRoom.Join(client)
+				case client := <-mainRoom.quit:
+					client.conn.Close()
+			}
+		}
+	}()
 }
 
 func main() {
