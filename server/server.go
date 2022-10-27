@@ -19,6 +19,8 @@ const (
 	CMD_HELP = "/help"
 
 	NAME = "anon"
+
+	NAME_CHANGE = ">> Your name has been changed to \"%s\".\n"
 )
 
 type MainRoom struct {
@@ -110,10 +112,9 @@ func (mainRoom *MainRoom) Parse(message *Message) {
 		switch {
 		case strings.HasPrefix(message.text, CMD_NAME):
 			name := strings.TrimSuffix(strings.TrimPrefix(message.text, CMD_NAME+" "), "\n")
-			fmt.Print(name)
-			fmt.Print("need to create name func")
+			mainRoom.Name(message.client, name)
 		case strings.HasPrefix(message.text, CMD_HELP):
-			fmt.Print("need to create help func")
+			mainRoom.Help(message.client)
 		case strings.HasPrefix(message.text, CMD_QUIT):
 			message.client.conn.Close()
 		case strings.HasPrefix(message.text, CMD_MSG):
@@ -124,16 +125,33 @@ func (mainRoom *MainRoom) Parse(message *Message) {
 	} else {
 		mainRoom.SendMessage(message)
 	}
-
 }
 
-// send message to all clients in the room
+// Send message to all clients in the room
 func (mainRoom *MainRoom) SendMessage(message *Message) {
 	msg := ">> " + message.client.name + ": " + message.text + "\n"
 	for _, client := range mainRoom.clients {
 		client.outgoing <- msg
 	}
 	log.Println("client sent message")
+}
+
+// Changes the client's name
+func (mainRoom *MainRoom) Name(client *Client, name string) {
+	client.outgoing <- fmt.Sprintf(NAME_CHANGE, name)
+	client.name = name
+	log.Println("client changed their name")
+}
+
+// List all available commands
+func (mainRoom *MainRoom) Help(client *Client) {
+	client.outgoing <- "\n"
+	client.outgoing <- "Commands:\n"
+	client.outgoing <- "/help - lists all commands\n"
+	client.outgoing <- "/name Tohfah - changes your name to Tohfah\n"
+	client.outgoing <- "/quit - quits the program\n"
+	client.outgoing <- "\n"
+	log.Println("client requested help")
 }
 
 // Reads in from client's socket and place msg on incoming channel
@@ -148,7 +166,7 @@ func (client *Client) Read() {
 		client.incoming <- message
 	}
 	close(client.incoming)
-	log.Println("Closed client's incoming channel.")
+	log.Println("Closed client's incoming channel")
 }
 
 // Reads from the Client's outgoing channel & write to client's socket
