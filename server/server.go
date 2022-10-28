@@ -29,6 +29,7 @@ const (
 // connected clients, and currently created chat rooms.
 type MainRoom struct {
 	clients  []*Client
+	rooms map[string]*Room
 	incoming chan *Message
 	join     chan *Client
 	quit     chan *Client
@@ -47,10 +48,17 @@ type Message struct {
 	text   string
 }
 
+type Room struct {
+	name     string
+	clients  []*Client
+	messages []string
+}
+
 // Creates a mainRoom which beings listening over its channels.
 func NewMainRoom() *MainRoom {
 	mainRoom := &MainRoom{
 		clients:  make([]*Client, 0),
+		rooms: 	  make(map[string]*Room),
 		incoming: make(chan *Message),
 		join:     make(chan *Client),
 		quit:     make(chan *Client),
@@ -83,6 +91,15 @@ func NewMessage(client *Client, text string) *Message {
 	}
 }
 
+// Create a new room with name, and stores messages and clients in the room
+func NewRoom(name string) *Room {
+	return &Room{
+		name:     name,
+		clients:  make([]*Client, 0),
+		messages: make([]string, 0),
+	}
+}
+
 // Starts a new thread which listens over the MainRoom's various channels.
 func (mainRoom *MainRoom) Listen() {
 	go func() {
@@ -99,19 +116,19 @@ func (mainRoom *MainRoom) Listen() {
 	}()
 }
 
-// func (mainRoom *MainRoom) CheckPassword(client *Client) bool {
-// 	client.outgoing <- "Enter Password: "
-// 	password := <-client.incoming
-// 	args := strings.Split(strings.Trim(password.text, "\r\n"), " ")
-// 	pass := strings.TrimSpace(args[0])
-// 	log.Print(pass)
-// 	if pass != "password" {
-// 		client.outgoing <- "Incorrect Password."
-// 		log.Print("incorrect")
-// 		client.conn.Close()
-// 	}
-// 	return true
-// }
+func (mainRoom *MainRoom) CheckPassword(client *Client) bool {
+	client.outgoing <- "Enter Password: "
+	password := <-client.incoming
+	args := strings.Split(strings.Trim(password.text, "\r\n"), " ")
+	pass := strings.TrimSpace(args[0])
+	log.Print(pass)
+	if pass != "password" {
+		client.outgoing <- "Incorrect Password."
+		log.Print("incorrect")
+		client.conn.Close()
+	}
+	return true
+}
 
 func (mainRoom *MainRoom) Join(client *Client) {
 	mainRoom.clients = append(mainRoom.clients, client)
