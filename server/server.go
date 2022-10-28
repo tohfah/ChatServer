@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	PORT = ":3333"
+	PORT = ":3030"
 	TYPE = "tcp"
 
 	CMD_MSG   = "/msg"
@@ -29,7 +29,7 @@ const (
 // connected clients, and currently created chat rooms.
 type MainRoom struct {
 	clients  []*Client
-	rooms map[string]*Room
+	rooms    map[string]*Room
 	incoming chan *Message
 	join     chan *Client
 	quit     chan *Client
@@ -58,7 +58,7 @@ type Room struct {
 func NewMainRoom() *MainRoom {
 	mainRoom := &MainRoom{
 		clients:  make([]*Client, 0),
-		rooms: 	  make(map[string]*Room),
+		rooms:    make(map[string]*Room),
 		incoming: make(chan *Message),
 		join:     make(chan *Client),
 		quit:     make(chan *Client),
@@ -117,7 +117,6 @@ func (mainRoom *MainRoom) Listen() {
 }
 
 func (mainRoom *MainRoom) CheckPassword(client *Client) bool {
-	client.outgoing <- "Enter Password: "
 	password := <-client.incoming
 	args := strings.Split(strings.Trim(password.text, "\r\n"), " ")
 	pass := strings.TrimSpace(args[0])
@@ -132,13 +131,15 @@ func (mainRoom *MainRoom) CheckPassword(client *Client) bool {
 
 func (mainRoom *MainRoom) Join(client *Client) {
 	mainRoom.clients = append(mainRoom.clients, client)
-	client.outgoing <- "You're connected to the server\n"
-	go func() {
-		for message := range client.incoming {
-			mainRoom.incoming <- message
-		}
-		mainRoom.quit <- client
-	}()
+	if mainRoom.CheckPassword(client) {
+		go func() {
+			for message := range client.incoming {
+				mainRoom.incoming <- message
+			}
+			mainRoom.quit <- client
+		}()
+		client.outgoing <- "You're connected to the server\n"
+	}
 }
 
 // Handles messages sent to the mainRoom
@@ -156,7 +157,6 @@ func (mainRoom *MainRoom) Parse(message *Message) {
 			mainRoom.Help(message.client)
 		case strings.HasPrefix(message.text, CMD_QUIT):
 			message.client.conn.Close()
-
 		default:
 			message.client.outgoing <- "Unknown command. Type /help for a list of available commands."
 		}
@@ -252,7 +252,6 @@ func (client *Client) Write() {
 // Creates a mainRoom, listens for client connections, and connects them to the
 // mainRoom.
 func main() {
-	//wg.Add(1)
 	mainRoom := NewMainRoom()
 
 	listener, err := net.Listen(TYPE, PORT)
@@ -269,8 +268,9 @@ func main() {
 			log.Println("Error: ", err)
 			continue
 		}
-		mainRoom.Join(NewClient(conn))
-		//wg.Wait()
+		newCli := NewClient(conn)
+		mainRoom.Join(newCli)
+		log.Println("New client has connected")
 	}
 
 }
