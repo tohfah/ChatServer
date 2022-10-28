@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	CONN_PORT = ":3333"
-	CONN_TYPE = "tcp"
+	PORT = ":3030"
+	TYPE = "tcp"
 
 	MSG_DISCONNECT = "Disconnected from the server.\n"
 )
@@ -61,7 +61,7 @@ func Write(conn net.Conn) {
 func main() {
 	wg.Add(1)
 
-	conn, err := net.Dial(CONN_TYPE, CONN_PORT)
+	conn, err := net.Dial(TYPE, PORT)
 	if err != nil {
 		fmt.Println(err)
 	}
