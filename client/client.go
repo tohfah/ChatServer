@@ -9,18 +9,21 @@ import (
 )
 
 const (
-	PORT     = ":8080"
-	TYPE     = "tcp"
+	CONN_PORT = ":3333"
+	CONN_TYPE = "tcp"
+
+	MSG_DISCONNECT = "Disconnected from the server.\n"
 )
 
 var wg sync.WaitGroup
 
+// Reads from the socket and outputs to the console.
 func Read(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	for {
 		str, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Printf("Disconnected from server")
+			fmt.Printf(MSG_DISCONNECT)
 			wg.Done()
 			return
 		}
@@ -28,6 +31,7 @@ func Read(conn net.Conn) {
 	}
 }
 
+// Reads from Stdin, and outputs to the socket.
 func Write(conn net.Conn) {
 	reader := bufio.NewReader(os.Stdin)
 	writer := bufio.NewWriter(conn)
@@ -44,14 +48,20 @@ func Write(conn net.Conn) {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-
+		err = writer.Flush()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
+// Starts up a read and write thread which connect to the server through the
+// a socket connection.
 func main() {
 	wg.Add(1)
 
-	conn, err := net.Dial(TYPE, PORT)
+	conn, err := net.Dial(CONN_TYPE, CONN_PORT)
 	if err != nil {
 		fmt.Println(err)
 	}

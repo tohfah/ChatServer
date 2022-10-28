@@ -10,26 +10,29 @@ import (
 )
 
 const (
-	PORT = ":8080"
+	PORT = ":3333"
 	TYPE = "tcp"
 
-	CMD_NAME = "/name"
-	CMD_MSG  = "/msg"
-	CMD_QUIT = "/quit"
-	CMD_HELP = "/help"
+	CMD_MSG   = "/msg"
+	CMD_SHOUT = "/shout"
+	CMD_NAME  = "/name"
+	CMD_HELP  = "/help"
+	CMD_QUIT  = "/quit"
 
-	NAME = "anon"
+	CLIENT_NAME = "Anon"
+	PASSWORD    = "password"
 
 	NAME_CHANGE = ">> Your name has been changed to \"%s\".\n"
 )
 
+// A MainRoom receives messages on its channels, and keeps track of the currently
+// connected clients, and currently created chat rooms.
 type MainRoom struct {
 	clients  []*Client
 	incoming chan *Message
 	join     chan *Client
 	quit     chan *Client
 }
-
 type Client struct {
 	name     string
 	incoming chan *Message
@@ -44,6 +47,7 @@ type Message struct {
 	text   string
 }
 
+// Creates a mainRoom which beings listening over its channels.
 func NewMainRoom() *MainRoom {
 	mainRoom := &MainRoom{
 		clients:  make([]*Client, 0),
@@ -60,7 +64,7 @@ func NewClient(conn net.Conn) *Client {
 	reader := bufio.NewReader(conn)
 
 	client := &Client{
-		name:     NAME,
+		name:     CLIENT_NAME,
 		incoming: make(chan *Message),
 		outgoing: make(chan string),
 		conn:     conn,
@@ -71,6 +75,7 @@ func NewClient(conn net.Conn) *Client {
 	return client
 }
 
+// Creates a new message with the given time, client and text.
 func NewMessage(client *Client, text string) *Message {
 	return &Message{
 		client: client,
@@ -78,15 +83,15 @@ func NewMessage(client *Client, text string) *Message {
 	}
 }
 
-// constantly listen to all channels in main room
+// Starts a new thread which listens over the MainRoom's various channels.
 func (mainRoom *MainRoom) Listen() {
 	go func() {
 		for {
 			select {
-			case message := <-mainRoom.incoming:
-				mainRoom.Parse(message)
 			case client := <-mainRoom.join:
 				mainRoom.Join(client)
+			case message := <-mainRoom.incoming:
+				mainRoom.Parse(message)
 			case client := <-mainRoom.quit:
 				client.conn.Close()
 			}
@@ -94,7 +99,20 @@ func (mainRoom *MainRoom) Listen() {
 	}()
 }
 
-// join clients to main room
+// func (mainRoom *MainRoom) CheckPassword(client *Client) bool {
+// 	client.outgoing <- "Enter Password: "
+// 	password := <-client.incoming
+// 	args := strings.Split(strings.Trim(password.text, "\r\n"), " ")
+// 	pass := strings.TrimSpace(args[0])
+// 	log.Print(pass)
+// 	if pass != "password" {
+// 		client.outgoing <- "Incorrect Password."
+// 		log.Print("incorrect")
+// 		client.conn.Close()
+// 	}
+// 	return true
+// }
+
 func (mainRoom *MainRoom) Join(client *Client) {
 	mainRoom.clients = append(mainRoom.clients, client)
 	client.outgoing <- "You're connected to the server\n"
@@ -106,10 +124,14 @@ func (mainRoom *MainRoom) Join(client *Client) {
 	}()
 }
 
-// handle commands
+// Handles messages sent to the mainRoom
 func (mainRoom *MainRoom) Parse(message *Message) {
 	if strings.HasPrefix(message.text, "/") {
 		switch {
+		case strings.HasPrefix(message.text, CMD_MSG):
+			mainRoom.SendMessage(message)
+		case strings.HasPrefix(message.text, CMD_SHOUT):
+			mainRoom.Shout(message)
 		case strings.HasPrefix(message.text, CMD_NAME):
 			name := strings.TrimSuffix(strings.TrimPrefix(message.text, CMD_NAME+" "), "\n")
 			mainRoom.Name(message.client, name)
@@ -117,44 +139,67 @@ func (mainRoom *MainRoom) Parse(message *Message) {
 			mainRoom.Help(message.client)
 		case strings.HasPrefix(message.text, CMD_QUIT):
 			message.client.conn.Close()
-		case strings.HasPrefix(message.text, CMD_MSG):
-			mainRoom.SendMessage(message)
+
 		default:
 			message.client.outgoing <- "Unknown command. Type /help for a list of available commands."
 		}
 	} else {
 		mainRoom.SendMessage(message)
 	}
+
 }
 
-// Send message to all clients in the room
+// Send the given message to the client's current room.
 func (mainRoom *MainRoom) SendMessage(message *Message) {
-	msg := ">> " + message.client.name + ": " + message.text + "\n"
+	msg := message.text
+	msgString := strings.Join([]string{message.text}, " ")
+	if strings.HasPrefix(message.text, CMD_MSG) {
+		msg = msgString[len(CMD_MSG)+1:]
+	}
+	fullMsg := ">> " + message.client.name + ": " + msg + "\n"
 	for _, client := range mainRoom.clients {
-		client.outgoing <- msg
+		client.outgoing <- fullMsg
 	}
 	log.Println("client sent message")
 }
 
-// Changes the client's name
+// Send the upper case message to the client's current room.
+func (mainRoom *MainRoom) Shout(message *Message) {
+	var msg string
+	msgString := strings.Join([]string{message.text}, " ")
+	msg = strings.ToUpper(msgString[len(CMD_SHOUT)+1:])
+	fullMsg := ">> " + message.client.name + ": " + msg + "\n"
+	for _, client := range mainRoom.clients {
+		client.outgoing <- fullMsg
+	}
+	log.Println("client sent shout message")
+}
+
+// Changes the client's name to the given name.
 func (mainRoom *MainRoom) Name(client *Client, name string) {
 	client.outgoing <- fmt.Sprintf(NAME_CHANGE, name)
 	client.name = name
 	log.Println("client changed their name")
 }
 
-// List all available commands
+// Sends to the client the list of possible commands to the client.
 func (mainRoom *MainRoom) Help(client *Client) {
 	client.outgoing <- "\n"
 	client.outgoing <- "Commands:\n"
 	client.outgoing <- "/help - lists all commands\n"
 	client.outgoing <- "/name Tohfah - changes your name to Tohfah\n"
-	client.outgoing <- "/quit - quits the program\n"
+	client.outgoing <- "/msg Hello - sends \"Hello\" to all members in the chat\n"
+	client.outgoing <- "/shout Hello - sends an upper case \"HELLO\" to all members in the chat\n"
+	client.outgoing <- "/quit - removes the client from the chat\n"
 	client.outgoing <- "\n"
 	log.Println("client requested help")
 }
 
-// Reads in from client's socket and place msg on incoming channel
+func (client *Client) Listen() {
+	go client.Read()
+	go client.Write()
+}
+
 func (client *Client) Read() {
 	for {
 		str, err := client.reader.ReadString('\n')
@@ -166,10 +211,11 @@ func (client *Client) Read() {
 		client.incoming <- message
 	}
 	close(client.incoming)
-	log.Println("Closed client's incoming channel")
+	log.Println("Closed client's incoming channel read thread")
 }
 
-// Reads from the Client's outgoing channel & write to client's socket
+// Reads in messages from the Client's outgoing channel, and writes them to the
+// Client's socket.
 func (client *Client) Write() {
 	for str := range client.outgoing {
 		_, err := client.writer.WriteString(str)
@@ -186,13 +232,10 @@ func (client *Client) Write() {
 	log.Println("Closed client's write thread")
 }
 
-func (client *Client) Listen() {
-	go client.Read()
-	go client.Write()
-}
-
+// Creates a mainRoom, listens for client connections, and connects them to the
+// mainRoom.
 func main() {
-
+	//wg.Add(1)
 	mainRoom := NewMainRoom()
 
 	listener, err := net.Listen(TYPE, PORT)
@@ -210,5 +253,7 @@ func main() {
 			continue
 		}
 		mainRoom.Join(NewClient(conn))
+		//wg.Wait()
 	}
+
 }
